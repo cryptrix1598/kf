@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KARMA FARM // v1.0</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: rgba(255,255,255,0.03);
+    --surface-hover: rgba(255,255,255,0.06);
+    --border: rgba(255,255,255,0.06);
+    --border-glow: rgba(0,255,255,0.15);
+    --cyan: #00f0ff;
+    --magenta: #ff00e5;
+    --purple: #7000ff;
+    --green: #00ff88;
+    --red: #ff3355;
+    --orange: #ff8800;
+    --text: rgba(255,255,255,0.92);
+    --text-dim: rgba(255,255,255,0.4);
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise {
+    position: fixed; inset: 0; z-index: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .bg-gradient {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0,240,255,0.08) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 80% 40%, rgba(255,0,229,0.05) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 20% 60%, rgba(112,0,255,0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 24px 32px 60px; }
+
+  /* HEADER */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 0; margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; font-weight: 700; color: #000;
+  }
+  .logo span { background: linear-gradient(135deg, var(--cyan), var(--magenta)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .logo .dim { background: none; -webkit-text-fill-color: var(--text-dim); font-weight: 400; }
+
+  .header-status {
+    display: flex; align-items: center; gap: 16px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    box-shadow: 0 0 8px var(--green);
+  }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.3s, background 0.3s;
+  }
+  .stat-card:hover { border-color: var(--border-glow); background: var(--surface-hover); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 6px; }
+  .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; font-family: 'JetBrains Mono', monospace; }
+  .stat-value.cyan { color: var(--cyan); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.magenta { color: var(--magenta); }
+  .stat-value.orange { color: var(--orange); }
+  .stat-value.red { color: var(--red); }
+
+  /* CONTROLS */
+  .controls {
+    display: flex; gap: 10px; margin-bottom: 28px;
+    flex-wrap: wrap;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 22px; border-radius: 10px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--text); cursor: pointer; transition: all 0.25s;
+    backdrop-filter: blur(8px);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    position: relative; overflow: hidden;
+  }
+  .btn::before {
+    content: ''; position: absolute; inset: 0; opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn:hover { transform: translateY(-1px); border-color: var(--border-glow); background: var(--surface-hover); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.3; pointer-events: none; }
+
+  .btn-cyan { border-color: rgba(0,240,255,0.3); color: var(--cyan); }
+  .btn-cyan:hover { border-color: var(--cyan); box-shadow: 0 0 20px rgba(0,240,255,0.1); background: rgba(0,240,255,0.06); }
+
+  .btn-magenta { border-color: rgba(255,0,229,0.3); color: var(--magenta); }
+  .btn-magenta:hover { border-color: var(--magenta); box-shadow: 0 0 20px rgba(255,0,229,0.1); background: rgba(255,0,229,0.06); }
+
+  .btn-green { border-color: rgba(0,255,136,0.3); color: var(--green); }
+  .btn-green:hover { border-color: var(--green); box-shadow: 0 0 20px rgba(0,255,136,0.1); background: rgba(0,255,136,0.06); }
+
+  .btn-red { border-color: rgba(255,51,85,0.3); color: var(--red); }
+  .btn-red:hover { border-color: var(--red); box-shadow: 0 0 20px rgba(255,51,85,0.1); background: rgba(255,51,85,0.06); }
+
+  .btn-ghost { border-color: transparent; color: var(--text-dim); }
+  .btn-ghost:hover { border-color: var(--border); color: var(--text); }
+
+  .btn-glow {
+    background: linear-gradient(135deg, rgba(0,240,255,0.15), rgba(255,0,229,0.15));
+    border-color: rgba(0,240,255,0.2);
+  }
+  .btn-glow:hover {
+    box-shadow: 0 0 30px rgba(0,240,255,0.15), 0 0 60px rgba(255,0,229,0.08);
+    border-color: rgba(0,240,255,0.4);
+  }
+
+  .btn-sm { padding: 6px 14px; font-size: 11px; }
+
+  .spinner {
+    width: 14px; height: 14px; border: 2px solid transparent;
+    border-top-color: currentColor; border-radius: 50%;
+    animation: spin 0.7s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* QUEUE */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--text-dim); font-weight: 600;
+  }
+  .section-count {
+    font-size: 12px; color: var(--text-dim); background: var(--surface);
+    padding: 2px 10px; border-radius: 20px; border: 1px solid var(--border);
+  }
+
+  .queue-empty {
+    text-align: center; padding: 60px 20px;
+    border: 1px dashed var(--border); border-radius: var(--radius);
+    color: var(--text-dim); font-size: 14px;
+  }
+  .queue-empty strong { color: var(--cyan); font-weight: 600; }
+
+  .post-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px 24px;
+    margin-bottom: 10px;
+    backdrop-filter: blur(12px);
+    transition: all 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .post-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--magenta), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .post-card:hover { border-color: var(--border-glow); background: var(--surface-hover); }
+  .post-card:hover::before { opacity: 1; }
+
+  .post-card.posted { border-color: rgba(0,255,136,0.2); }
+  .post-card.posted::before { opacity: 1; background: linear-gradient(90deg, transparent, var(--green), transparent); }
+  .post-card.failed { border-color: rgba(255,51,85,0.2); }
+  .post-card.failed::before { opacity: 1; background: linear-gradient(90deg, transparent, var(--red), transparent); }
+  .post-card.rejected { opacity: 0.4; }
+
+  .post-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; margin-bottom: 10px;
+  }
+  .post-subreddit {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px; border-radius: 6px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    background: rgba(0,240,255,0.08); color: var(--cyan);
+    border: 1px solid rgba(0,240,255,0.15);
+    flex-shrink: 0;
+  }
+  .post-title {
+    font-size: 16px; font-weight: 600; line-height: 1.4;
+    margin-bottom: 8px; letter-spacing: -0.2px;
+  }
+  .post-content {
+    font-size: 13px; color: var(--text-dim); line-height: 1.6;
+    margin-bottom: 10px; max-height: 48px; overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .post-reasoning {
+    font-size: 12px; color: var(--text-dim);
+    font-style: italic; padding: 8px 12px;
+    background: rgba(255,255,255,0.02); border-radius: 8px;
+    margin-bottom: 14px; border-left: 2px solid var(--purple);
+  }
+  .post-actions {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .post-actions .btn { padding: 6px 16px; font-size: 12px; }
+
+  .post-meta {
+    display: flex; gap: 16px; align-items: center;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .post-meta span { display: flex; align-items: center; gap: 4px; }
+  .post-time { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+  .post-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 3px 10px; border-radius: 6px;
+  }
+  .post-status.pending { background: rgba(255,136,0,0.1); color: var(--orange); }
+  .post-status.posted { background: rgba(0,255,136,0.1); color: var(--green); }
+  .post-status.failed { background: rgba(255,51,85,0.1); color: var(--red); }
+  .post-status.approved { background: rgba(0,240,255,0.1); color: var(--cyan); }
+  .post-status.rejected { background: rgba(255,255,255,0.03); color: var(--text-dim); }
+
+  /* TOAST */
+  .toast-container {
+    position: fixed; bottom: 24px; right: 24px; z-index: 100;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .toast {
+    padding: 12px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(16px); border: 1px solid var(--border);
+    animation: slideIn 0.3s ease; min-width: 260px;
+  }
+  .toast.success { background: rgba(0,255,136,0.1); border-color: rgba(0,255,136,0.2); color: var(--green); }
+  .toast.error { background: rgba(255,51,85,0.1); border-color: rgba(255,51,85,0.2); color: var(--red); }
+  .toast.info { background: rgba(0,240,255,0.1); border-color: rgba(0,240,255,0.2); color: var(--cyan); }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* AUTO CONTROL */
+  .auto-control {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px;
+    font-size: 13px; color: var(--text-dim);
+  }
+  .auto-toggle {
+    width: 40px; height: 22px; border-radius: 11px;
+    background: rgba(255,255,255,0.1); border: none; cursor: pointer;
+    position: relative; transition: background 0.3s;
+  }
+  .auto-toggle.active { background: var(--green); }
+  .auto-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: transform 0.3s;
+  }
+  .auto-toggle.active::after { transform: translateX(18px); }
+
+  /* COOKIE IMPORT */
+  .cookie-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    margin-bottom: 24px; backdrop-filter: blur(12px);
+    display: none;
+  }
+  .cookie-section.visible { display: block; }
+  .cookie-section.hidden { display: none; }
+  .cookie-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--cyan); font-weight: 600; margin-bottom: 12px;
+  }
+  .cookie-steps {
+    font-size: 13px; color: var(--text-dim); line-height: 1.7;
+    margin-bottom: 16px;
+  }
+  .cookie-steps code {
+    background: rgba(0,240,255,0.08); color: var(--cyan);
+    padding: 1px 6px; border-radius: 4px; font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .cookie-steps ol { padding-left: 20px; }
+  .cookie-steps li { margin-bottom: 4px; }
+  .cookie-textarea {
+    width: 100%; min-height: 120px;
+    background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); padding: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    resize: vertical; margin-bottom: 12px;
+    outline: none; transition: border-color 0.3s;
+  }
+  .cookie-textarea:focus { border-color: var(--cyan); }
+  .connected-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 8px;
+    font-size: 12px; font-weight: 600;
+    background: rgba(0,255,136,0.1); color: var(--green);
+    border: 1px solid rgba(0,255,136,0.2);
+  }
+
+  @media (max-width: 768px) {
+    .app { padding: 16px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .post-top { flex-direction: column; }
+    .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="noise"></div>
+<div class="bg-gradient"></div>
+<div class="grid-bg"></div>
+
+<div class="app">
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">K</div>
+      <div>KARMA <span>FARM</span><span class="dim"> // v1.0</span></div>
+    </div>
+    <div class="header-status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Initializing...</span>
+    </div>
+  </header>
+
+  <div id="cookieSection" class="cookie-section visible">
+    <div class="cookie-title">🔑 Connect Reddit Account</div>
+    <div class="cookie-steps">
+      <ol>
+        <li>Log into <strong>reddit.com</strong> in your browser</li>
+        <li>Open DevTools (<code>F12</code>) → <strong>Application</strong> tab → <strong>Cookies</strong> → <strong>reddit.com</strong></li>
+        <li>Right-click any cookie → <strong>Export as JSON</strong> (or copy all cookies as JSON array)</li>
+        <li>Paste the full cookie JSON below:</li>
+      </ol>
+    </div>
+    <textarea class="cookie-textarea" id="cookieInput" placeholder='[{"name":"reddit_session","value":"...","domain":"reddit.com"}, ...]'></textarea>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-cyan" onclick="submitCookies()">Connect</button>
+      <span id="connectedBadge" style="display:none;" class="connected-badge">✓ Connected</span>
+    </div>
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card">
+      <div class="stat-label">Queue</div>
+      <div class="stat-value cyan" id="statQueue">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Posted</div>
+      <div class="stat-value green" id="statPosted">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value red" id="statFailed">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Generated</div>
+      <div class="stat-value magenta" id="statTotal">0</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-glow" id="btnGenerate" onclick="generatePosts()">
+      <span>⟳</span> Generate Posts
+    </button>
+    <button class="btn btn-green" id="btnApproveAll" onclick="approveAll()">
+      <span>✓</span> Approve & Post All
+    </button>
+
+    <div class="auto-control">
+      <span>Auto-Generate</span>
+      <button class="auto-toggle" id="autoToggle" onclick="toggleAuto()"></button>
+      <span id="autoIntervalLabel">every 15m</span>
+    </div>
+
+    <button class="btn btn-ghost btn-sm" onclick="loadQueue()" style="margin-left:auto;">
+      ⟳ Refresh
+    </button>
+  </div>
+
+  <div class="section-header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="section-title">Post Queue</span>
+      <span class="section-count" id="queueCount">0 pending</span>
+    </div>
+  </div>
+
+  <div id="queueContainer">
+    <div class="queue-empty">
+      Queue is empty.<br>
+      Click <strong>Generate Posts</strong> to have AI find rising subreddits and create content.
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+let isAutoRunning = false;
+let isGenerating = false;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  return res.json();
+}
+
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+async function loadStats() {
+  const s = await api('/api/stats');
+  document.getElementById('statQueue').textContent = s.pending || 0;
+  document.getElementById('statPosted').textContent = s.posted || 0;
+  document.getElementById('statFailed').textContent = s.failed || 0;
+  document.getElementById('statTotal').textContent = s.totalGenerated || 0;
+}
+
+async function loadQueue() {
+  const data = await api('/api/queue');
+  const container = document.getElementById('queueContainer');
+  const stats = await api('/api/stats');
+
+  if (!data.queue || data.queue.length === 0) {
+    container.innerHTML = `<div class="queue-empty">
+      Queue is empty.<br>
+      Click <strong>Generate Posts</strong> to have AI find rising subreddits and create content.
+    </div>`;
+    document.getElementById('queueCount').textContent = '0 pending';
+    loadStats();
+    return;
+  }
+
+  const pending = data.queue.filter(p => p.status === 'pending').length;
+  document.getElementById('queueCount').textContent = `${pending} pending`;
+
+  container.innerHTML = data.queue.map(post => {
+    const statusClass = post.status;
+    const timeAgo = timeSince(post.createdAt);
+    return `<div class="post-card ${statusClass === 'posted' ? 'posted' : statusClass === 'failed' ? 'failed' : statusClass === 'rejected' ? 'rejected' : ''}">
+      <div class="post-top">
+        <div>
+          <span class="post-subreddit">r/${post.subreddit}</span>
+          <span class="post-status ${post.status}">${post.status}</span>
+        </div>
+        <span class="post-time">${timeAgo}</span>
+      </div>
+      <div class="post-title">${escapeHtml(post.title)}</div>
+      ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
+      ${post.reasoning ? `<div class="post-reasoning">💡 ${escapeHtml(post.reasoning)}</div>` : ''}
+      <div class="post-actions">
+        ${post.status === 'pending' ? `
+          <button class="btn btn-green btn-sm" onclick="approvePost('${post.id}')">✓ Approve & Post</button>
+          <button class="btn btn-red btn-sm" onclick="rejectPost('${post.id}')">✕ Reject</button>
+        ` : ''}
+        ${post.result && post.result.error ? `<span style="font-size:11px;color:var(--red)">${escapeHtml(post.result.error)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  loadStats();
+}
+
+async function generatePosts() {
+  if (isGenerating) return;
+  isGenerating = true;
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+  try {
+    const data = await api('/api/generate', { method: 'POST' });
+    if (data.error) { toast(data.error, 'error'); return; }
+    toast(`Generated post for r/${data.post.subreddit}`, 'success');
+    loadQueue();
+  } catch (e) {
+    toast('Generation failed: ' + e.message, 'error');
+  } finally {
+    isGenerating = false;
+    btn.disabled = false;
+    btn.innerHTML = '<span>⟳</span> Generate Posts';
+  }
+}
+
+async function approvePost(id) {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    const data = await api(`/api/approve/${id}`, { method: 'POST' });
+    if (data.success) {
+      toast('Post submitted successfully!', 'success');
+    } else {
+      toast('Post failed: ' + (data.error || 'Unknown error'), 'error');
+    }
+    loadQueue();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+    loadQueue();
+  }
+}
+
+async function approveAll() {
+  const btn = document.getElementById('btnApproveAll');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Posting...';
+
+  try {
+    const data = await api('/api/approve-all', { method: 'POST' });
+    const success = data.results.filter(r => r.success).length;
+    const failed = data.results.filter(r => !r.success).length;
+    toast(`Posted ${success}, failed ${failed}`, failed > 0 ? 'error' : 'success');
+    loadQueue();
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>✓</span> Approve & Post All';
+  }
+}
+
+async function rejectPost(id) {
+  await api(`/api/reject/${id}`, { method: 'POST' });
+  toast('Post rejected', 'info');
+  loadQueue();
+}
+
+async function toggleAuto() {
+  const toggle = document.getElementById('autoToggle');
+  if (isAutoRunning) {
+    await api('/api/auto-generate/stop', { method: 'POST' });
+    isAutoRunning = false;
+    toggle.classList.remove('active');
+    toast('Auto-generate stopped', 'info');
+  } else {
+    await api('/api/auto-generate/start', { method: 'POST', body: { intervalMinutes: 15 } });
+    isAutoRunning = true;
+    toggle.classList.add('active');
+    toast('Auto-generate started (every 15m)', 'success');
+  }
+}
+
+async function submitCookies() {
+  const input = document.getElementById('cookieInput');
+  const badge = document.getElementById('connectedBadge');
+  let cookieJson;
+
+  try {
+    cookieJson = JSON.parse(input.value);
+    if (!Array.isArray(cookieJson)) cookieJson = [cookieJson];
+  } catch {
+    toast('Invalid JSON. Export cookies as JSON array from DevTools.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/cookies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cookies: cookieJson }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast('Reddit connected!', 'success');
+      document.getElementById('cookieSection').classList.remove('visible');
+      document.getElementById('cookieSection').classList.add('hidden');
+      badge.style.display = 'inline-flex';
+    } else {
+      toast('Connection failed: ' + (data.error || 'Unknown'), 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+async function checkStatus() {
+  try {
+    const s = await api('/api/status');
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (s.online) {
+      dot.style.background = 'var(--green)';
+      dot.style.boxShadow = '0 0 8px var(--green)';
+      text.textContent = 'Online' + (s.autoGenerate ? ' • Auto-Generating' : '');
+    }
+    const cookieSection = document.getElementById('cookieSection');
+    const badge = document.getElementById('connectedBadge');
+    if (s.redditConnected) {
+      cookieSection.classList.remove('visible');
+      cookieSection.classList.add('hidden');
+      badge.style.display = 'inline-flex';
+    } else {
+      cookieSection.classList.add('visible');
+      cookieSection.classList.remove('hidden');
+      badge.style.display = 'none';
+    }
+  } catch (e) {
+    document.getElementById('statusDot').style.background = 'var(--red)';
+    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--red)';
+    document.getElementById('statusText').textContent = 'Offline';
+  }
+}
+
+function timeSince(ts) {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+setInterval(loadQueue, 10000);
+setInterval(checkStatus, 5000);
+checkStatus();
+loadQueue();
+</script>
+</body>
+</html>
