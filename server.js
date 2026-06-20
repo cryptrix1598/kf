@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { generatePost, generateReply } from './src/ai-client.js';
 import { discoverRisingSubreddits, getSubredditTrending, closeBrowser as closeScraper } from './src/reddit-scraper.js';
-import { submitPost, loginWithCookies, closeBrowser as closePoster } from './src/reddit-poster.js';
+import { submitPost, loginToReddit } from './src/reddit-poster.js';
 import { postQueue } from './src/post-queue.js';
 
 dotenv.config();
@@ -27,17 +27,6 @@ app.get('/api/status', (req, res) => {
     autoGenerate: autoGenerateInterval !== null,
     generating: isGenerating,
   });
-});
-
-app.post('/api/cookies', async (req, res) => {
-  try {
-    await loginWithCookies(req.body.cookies);
-    redditConnected = true;
-    res.json({ success: true });
-  } catch (err) {
-    redditConnected = false;
-    res.status(400).json({ error: err.message });
-  }
 });
 
 app.get('/api/queue', (req, res) => {
@@ -198,16 +187,24 @@ app.get('*', (req, res) => {
 });
 
 async function init() {
+  if (process.env.REDDIT_CLIENT_ID) {
+    try {
+      await loginToReddit();
+      redditConnected = true;
+    } catch (err) {
+      console.error('OAuth login failed:', err.message);
+      console.log('Run: node setup-oauth.js to create a Reddit app');
+    }
+  }
+
   app.listen(PORT, () => {
     console.log(`\n  🚀 Karma Farmer running at http://localhost:${PORT}\n`);
-    console.log(`  Paste Reddit cookies at http://localhost:${PORT} to start posting\n`);
   });
 }
 
 process.on('SIGINT', async () => {
   if (autoGenerateInterval) clearInterval(autoGenerateInterval);
   await closeScraper();
-  await closePoster();
   process.exit();
 });
 

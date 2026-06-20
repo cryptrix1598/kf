@@ -1,87 +1,93 @@
-import { chromium } from 'playwright';
 import dotenv from 'dotenv';
 dotenv.config();
 
-let browser;
-let context;
-let loggedIn = false;
+const USER_AGENT = 'KarmaFarmer/1.0 by InvestigatorDull9853';
+let accessToken = null;
+let tokenExpiry = 0;
 
-export async function loginWithCookies(cookieJson) {
-  if (browser) await browser.close();
+export async function loginToReddit() {
+  const { REDDIT_USERNAME, REDDIT_PASSWORD, REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET } = process.env;
 
-  browser = await chromium.launch({ headless: true });
-  context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    viewport: { width: 1920, height: 1080 },
+  if (!REDDIT_USERNAME || !REDDIT_PASSWORD) {
+    throw new Error('REDDIT_USERNAME and REDDIT_PASSWORD must be set in .env');
+  }
+
+  if (!REDDIT_CLIENT_ID) {
+    throw new Error('REDDIT_CLIENT_ID not set. Run: node setup-oauth.js');
+  }
+
+  const auth = REDDIT_CLIENT_SECRET
+    ? Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64')
+    : Buffer.from(`${REDDIT_CLIENT_ID}:`).toString('base64');
+
+  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': USER_AGENT,
+    },
+    body: new URLSearchParams({
+      grant_type: 'password',
+      username: REDDIT_USERNAME,
+      password: REDDIT_PASSWORD,
+    }),
   });
 
-  const cookies = typeof cookieJson === 'string' ? JSON.parse(cookieJson) : cookieJson;
-  await context.addCookies(cookies);
-  loggedIn = true;
-  console.log('Cookies loaded, logged into Reddit');
-  return true;
+  const data = await res.json();
+
+  if (!data.access_token) {
+    throw new Error(`OAuth failed: ${data.error || JSON.stringify(data)}. Check REDDIT_CLIENT_ID is correct.`);
+  }
+
+  accessToken = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  console.log('Logged into Reddit via OAuth');
 }
 
-export async function setCookiesFromBrowser() {
-  return false; // placeholder
+async function ensureToken() {
+  if (!accessToken || Date.now() > tokenExpiry) {
+    await loginToReddit();
+  }
 }
 
 export async function submitPost(subreddit, title, content, type = 'text') {
-  if (!loggedIn || !browser) {
-    throw new Error('Not logged in. Provide cookies first.');
-  }
+  await ensureToken();
 
-  const postPage = await context.newPage();
+  const params = {
+    api_type: 'json',
+    kind: type === 'link' ? 'link' : 'self',
+    sr: subreddit,
+    title: title,
+  };
+
+  if (type === 'text' && content) {
+    params.text = content;
+  } else if (type === 'link' && content) {
+    params.url = content;
+  }
 
   try {
-    await postPage.goto(`https://www.reddit.com/r/${subreddit}/submit`, { waitUntil: 'load', timeout: 30000 });
-    await postPage.waitForTimeout(3000);
+    const res = await fetch('https://oauth.reddit.com/api/submit', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': USER_AGENT,
+      },
+      body: new URLSearchParams(params),
+    });
 
-    const url = postPage.url();
-    if (url.includes('login')) {
-      loggedIn = false;
-      throw new Error('Session expired. Re-export cookies.');
+    const data = await res.json();
+
+    if (data?.json?.errors?.length > 0) {
+      const errMsg = data.json.errors.map(e => e[1] || e[0]).join(', ');
+      return { success: false, error: errMsg, title, subreddit };
     }
 
-    await postPage.waitForSelector('#post-title, [slot="title"], input, textarea', { timeout: 10000 }).catch(() => {});
-    await postPage.waitForTimeout(1000);
-
-    const titleInput = await postPage.$('#post-title') || await postPage.$('textarea') || await postPage.$('input:not([type="hidden"])');
-    if (!titleInput) throw new Error('Could not find title input');
-
-    await titleInput.click();
-    await titleInput.fill(title);
-    await postPage.waitForTimeout(500);
-
-    const bodyInput = await postPage.$('div[contenteditable="true"], textarea#text, textarea');
-    if (type === 'text' && content && bodyInput && await bodyInput.getAttribute('id') !== 'post-title') {
-      await bodyInput.click();
-      await bodyInput.fill(content);
-      await postPage.waitForTimeout(500);
-    }
-
-    const submitBtn = await postPage.$('button[type="submit"]') || await postPage.$('button:has-text("Post")');
-    if (submitBtn) {
-      await submitBtn.click();
-      await postPage.waitForTimeout(5000);
-      console.log(`Posted to r/${subreddit}: "${title}"`);
-      return { success: true, title, subreddit };
-    }
-
-    throw new Error('Could not find submit button');
+    console.log(`Posted to r/${subreddit}: "${title}"`);
+    return { success: true, title, subreddit };
   } catch (err) {
-    console.error(`Failed to post to r/${subreddit}:`, err.message);
     return { success: false, error: err.message, title, subreddit };
-  } finally {
-    await postPage.close();
-  }
-}
-
-export async function closeBrowser() {
-  if (browser) {
-    await browser.close();
-    browser = null;
-    context = null;
-    loggedIn = false;
   }
 }

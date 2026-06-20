@@ -296,39 +296,28 @@
   }
   .auto-toggle.active::after { transform: translateX(18px); }
 
-  /* COOKIE IMPORT */
-  .cookie-section {
+  /* SETUP BANNER */
+  .setup-section {
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); padding: 24px;
     margin-bottom: 24px; backdrop-filter: blur(12px);
     display: none;
   }
-  .cookie-section.visible { display: block; }
-  .cookie-section.hidden { display: none; }
-  .cookie-title {
+  .setup-section.visible { display: block; }
+  .setup-section.hidden { display: none; }
+  .setup-title {
     font-size: 13px; text-transform: uppercase; letter-spacing: 2px;
-    color: var(--cyan); font-weight: 600; margin-bottom: 12px;
+    color: var(--orange); font-weight: 600; margin-bottom: 8px;
   }
-  .cookie-steps {
+  .setup-text {
     font-size: 13px; color: var(--text-dim); line-height: 1.7;
-    margin-bottom: 16px;
+    margin-bottom: 6px;
   }
-  .cookie-steps code {
+  .setup-text code {
     background: rgba(0,240,255,0.08); color: var(--cyan);
-    padding: 1px 6px; border-radius: 4px; font-size: 12px;
+    padding: 2px 8px; border-radius: 4px; font-size: 12px;
     font-family: 'JetBrains Mono', monospace;
   }
-  .cookie-steps ol { padding-left: 20px; }
-  .cookie-steps li { margin-bottom: 4px; }
-  .cookie-textarea {
-    width: 100%; min-height: 120px;
-    background: rgba(0,0,0,0.3); border: 1px solid var(--border);
-    border-radius: 10px; color: var(--text); padding: 14px;
-    font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    resize: vertical; margin-bottom: 12px;
-    outline: none; transition: border-color 0.3s;
-  }
-  .cookie-textarea:focus { border-color: var(--cyan); }
   .connected-badge {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 14px; border-radius: 8px;
@@ -363,21 +352,12 @@
     </div>
   </header>
 
-  <div id="cookieSection" class="cookie-section visible">
-    <div class="cookie-title">🔑 Connect Reddit Account</div>
-    <div class="cookie-steps">
-      <ol>
-        <li>Log into <strong>reddit.com</strong> in your browser</li>
-        <li>Open DevTools (<code>F12</code>) → <strong>Application</strong> tab → <strong>Cookies</strong> → <strong>reddit.com</strong></li>
-        <li>Right-click any cookie → <strong>Export as JSON</strong> (or copy all cookies as JSON array)</li>
-        <li>Paste the full cookie JSON below:</li>
-      </ol>
-    </div>
-    <textarea class="cookie-textarea" id="cookieInput" placeholder='[{"name":"reddit_session","value":"...","domain":"reddit.com"}, ...]'></textarea>
-    <div style="display:flex;gap:10px;">
-      <button class="btn btn-cyan" onclick="submitCookies()">Connect</button>
-      <span id="connectedBadge" style="display:none;" class="connected-badge">✓ Connected</span>
-    </div>
+  <div id="setupSection" class="setup-section visible">
+    <div class="setup-title">⚡ Reddit API Setup Required</div>
+    <div class="setup-text">Run this in your terminal to create a Reddit OAuth app:</div>
+    <div class="setup-text"><code>node setup-oauth.js</code></div>
+    <div class="setup-text" style="margin-top:8px;">A browser will open — log into Reddit, and the app credentials will be saved automatically.</div>
+    <span id="connectedBadge" style="display:none;" class="connected-badge" style="margin-top:10px;">✓ Connected via OAuth</span>
   </div>
 
   <div class="stats-row" id="statsRow">
@@ -589,36 +569,18 @@ async function toggleAuto() {
   }
 }
 
-async function submitCookies() {
-  const input = document.getElementById('cookieInput');
+async function checkSetup() {
+  const s = await api('/api/status');
+  const setupSection = document.getElementById('setupSection');
   const badge = document.getElementById('connectedBadge');
-  let cookieJson;
-
-  try {
-    cookieJson = JSON.parse(input.value);
-    if (!Array.isArray(cookieJson)) cookieJson = [cookieJson];
-  } catch {
-    toast('Invalid JSON. Export cookies as JSON array from DevTools.', 'error');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/cookies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cookies: cookieJson }),
-    });
-    const data = await res.json();
-    if (data.success) {
-      toast('Reddit connected!', 'success');
-      document.getElementById('cookieSection').classList.remove('visible');
-      document.getElementById('cookieSection').classList.add('hidden');
-      badge.style.display = 'inline-flex';
-    } else {
-      toast('Connection failed: ' + (data.error || 'Unknown'), 'error');
-    }
-  } catch (e) {
-    toast('Error: ' + e.message, 'error');
+  if (s.redditConnected) {
+    setupSection.classList.remove('visible');
+    setupSection.classList.add('hidden');
+    badge.style.display = 'inline-flex';
+  } else {
+    setupSection.classList.add('visible');
+    setupSection.classList.remove('hidden');
+    badge.style.display = 'none';
   }
 }
 
@@ -632,16 +594,16 @@ async function checkStatus() {
       dot.style.boxShadow = '0 0 8px var(--green)';
       text.textContent = 'Online' + (s.autoGenerate ? ' • Auto-Generating' : '');
     }
-    const cookieSection = document.getElementById('cookieSection');
+    const setupSection = document.getElementById('setupSection');
     const badge = document.getElementById('connectedBadge');
     if (s.redditConnected) {
-      cookieSection.classList.remove('visible');
-      cookieSection.classList.add('hidden');
-      badge.style.display = 'inline-flex';
+      setupSection?.classList.remove('visible');
+      setupSection?.classList.add('hidden');
+      if (badge) badge.style.display = 'inline-flex';
     } else {
-      cookieSection.classList.add('visible');
-      cookieSection.classList.remove('hidden');
-      badge.style.display = 'none';
+      setupSection?.classList.add('visible');
+      setupSection?.classList.remove('hidden');
+      if (badge) badge.style.display = 'none';
     }
   } catch (e) {
     document.getElementById('statusDot').style.background = 'var(--red)';
