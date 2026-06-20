@@ -353,11 +353,13 @@
   </header>
 
   <div id="setupSection" class="setup-section visible">
-    <div class="setup-title">⚡ Reddit API Setup Required</div>
-    <div class="setup-text">Run this in your terminal to create a Reddit OAuth app:</div>
-    <div class="setup-text"><code>node setup-oauth.js</code></div>
-    <div class="setup-text" style="margin-top:8px;">A browser will open — log into Reddit, and the app credentials will be saved automatically.</div>
-    <span id="connectedBadge" style="display:none;" class="connected-badge" style="margin-top:10px;">✓ Connected via OAuth</span>
+    <div class="setup-title">🔗 Connect Opera GX</div>
+    <div class="setup-text">Click below to open Opera GX with remote debugging enabled.</div>
+    <div class="setup-text" style="margin-top:6px;">Log into Reddit in the Opera window — it auto-connects.</div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center;">
+      <button class="btn btn-cyan" onclick="connectOpera()" id="connectBtn">Launch Opera GX</button>
+      <span id="connectedBadge" style="display:none;" class="connected-badge">✓ Connected</span>
+    </div>
   </div>
 
   <div class="stats-row" id="statsRow">
@@ -569,18 +571,56 @@ async function toggleAuto() {
   }
 }
 
-async function checkSetup() {
-  const s = await api('/api/status');
-  const setupSection = document.getElementById('setupSection');
-  const badge = document.getElementById('connectedBadge');
-  if (s.redditConnected) {
-    setupSection.classList.remove('visible');
-    setupSection.classList.add('hidden');
-    badge.style.display = 'inline-flex';
+async function connectOpera() {
+  const btn = document.getElementById('connectBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Launching...';
+
+  const res = await api('/api/connect', { method: 'POST' });
+  if (res.success) {
+    toast('Opera GX opened. Log into Reddit in the Opera window.', 'info');
+    btn.textContent = 'Waiting for login...';
+
+    const check = setInterval(async () => {
+      const s = await api('/api/connect/check', { method: 'POST' });
+      if (s.connected) {
+        clearInterval(check);
+        toast('Connected to Reddit!', 'success');
+        checkStatus();
+      }
+    }, 3000);
   } else {
-    setupSection.classList.add('visible');
-    setupSection.classList.remove('hidden');
-    badge.style.display = 'none';
+    toast('Failed: ' + (res.error || 'Unknown'), 'error');
+    btn.disabled = false;
+    btn.innerHTML = 'Launch Opera GX';
+  }
+}
+
+async function checkStatus() {
+  try {
+    const s = await api('/api/status');
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    if (s.online) {
+      dot.style.background = 'var(--green)';
+      dot.style.boxShadow = '0 0 8px var(--green)';
+      text.textContent = 'Online' + (s.autoGenerate ? ' • Auto-Generating' : '');
+    }
+    const setupSection = document.getElementById('setupSection');
+    const badge = document.getElementById('connectedBadge');
+    if (s.redditConnected) {
+      setupSection?.classList.remove('visible');
+      setupSection?.classList.add('hidden');
+      if (badge) badge.style.display = 'inline-flex';
+    } else {
+      setupSection?.classList.add('visible');
+      setupSection?.classList.remove('hidden');
+      if (badge) badge.style.display = 'none';
+    }
+  } catch (e) {
+    document.getElementById('statusDot').style.background = 'var(--red)';
+    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--red)';
+    document.getElementById('statusText').textContent = 'Offline';
   }
 }
 

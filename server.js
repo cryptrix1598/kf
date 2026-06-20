@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { generatePost, generateReply } from './src/ai-client.js';
 import { discoverRisingSubreddits, getSubredditTrending, closeBrowser as closeScraper } from './src/reddit-scraper.js';
-import { submitPost, loginToReddit } from './src/reddit-poster.js';
+import { submitPost, launchOpera, connectCDP, isConnected } from './src/reddit-poster.js';
 import { postQueue } from './src/post-queue.js';
 
 dotenv.config();
@@ -149,6 +149,25 @@ app.post('/api/reject/:id', (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/connect', async (req, res) => {
+  try {
+    await launchOpera();
+    res.json({ success: true, message: 'Opera GX launched. Log in and it will auto-connect.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/connect/check', async (req, res) => {
+  const ok = await connectCDP();
+  if (ok) {
+    redditConnected = true;
+    res.json({ connected: true });
+  } else {
+    res.json({ connected: false });
+  }
+});
+
 app.post('/api/auto-generate/start', (req, res) => {
   if (autoGenerateInterval) {
     return res.json({ running: true });
@@ -187,18 +206,16 @@ app.get('*', (req, res) => {
 });
 
 async function init() {
-  if (process.env.REDDIT_CLIENT_ID) {
-    try {
-      await loginToReddit();
-      redditConnected = true;
-    } catch (err) {
-      console.error('OAuth login failed:', err.message);
-      console.log('Run: node setup-oauth.js to create a Reddit app');
+  setInterval(async () => {
+    if (!redditConnected) {
+      const ok = await connectCDP();
+      if (ok) redditConnected = true;
     }
-  }
+  }, 5000);
 
   app.listen(PORT, () => {
     console.log(`\n  🚀 Karma Farmer running at http://localhost:${PORT}\n`);
+    console.log('   Open the UI and click "Connect" to link Opera GX.\n');
   });
 }
 
