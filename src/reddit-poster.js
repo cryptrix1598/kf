@@ -14,17 +14,34 @@ export function isConnected() {
 }
 
 export async function launchOpera() {
+  // First check if Opera is already running with CDP
+  try {
+    const test = await fetch(`http://localhost:${CDP_PORT}/json/version`).catch(() => null);
+    if (test?.ok) {
+      console.log('Opera GX already running with CDP. Connecting...');
+      return await connectCDP();
+    }
+  } catch {}
+
+  // Kill and restart
   try { execSync('taskkill /F /IM opera.exe 2>nul', { stdio: 'ignore' }); } catch {}
   await new Promise(r => setTimeout(r, 1000));
 
-  console.log('🚀 Launching Opera GX with remote debugging...');
+  console.log('Launching Opera GX with remote debugging...');
   spawn(OPERA_PATH, [`--remote-debugging-port=${CDP_PORT}`], { detached: true, stdio: 'ignore' });
-  await new Promise(r => setTimeout(r, 5000));
+  await new Promise(r => setTimeout(r, 6000));
   console.log('Opera GX opened. Log into Reddit in the Opera window.');
 }
 
 export async function connectCDP() {
   try {
+    const test = await fetch(`http://localhost:${CDP_PORT}/json/version`).catch(() => null);
+    if (!test?.ok) return false;
+
+    if (cdpBrowser) {
+      try { await cdpBrowser.close(); } catch {}
+    }
+
     cdpBrowser = await chromium.connectOverCDP(`http://localhost:${CDP_PORT}`);
     const page = await cdpBrowser.newPage();
     await page.goto('https://www.reddit.com/', { waitUntil: 'load', timeout: 30000 });
@@ -33,23 +50,34 @@ export async function connectCDP() {
     const isLoggedIn = !page.url().includes('login');
     await page.close();
 
-    if (isLoggedIn) {
-      connected = true;
-      console.log('✅ Connected to Reddit session via Opera!');
-      return true;
-    }
-    return false;
+    connected = isLoggedIn;
+    if (isLoggedIn) console.log('Connected to Reddit session via Opera!');
+    return isLoggedIn;
   } catch (err) {
     console.error('CDP connection failed:', err.message);
+    connected = false;
     return false;
   }
 }
 
-export async function submitPost(subreddit, title, content, type = 'text') {
-  if (!cdpBrowser) {
-    throw new Error('Not connected. Launch Opera and log in first.');
+async function ensureConnected() {
+  if (!connected || !cdpBrowser) {
+    const ok = await connectCDP();
+    if (!ok) throw new Error('Not connected to Opera. Launch Opera and log into Reddit first.');
   }
+  // Verify connection is alive
+  try {
+    const p = await cdpBrowser.newPage();
+    await p.close();
+  } catch {
+    connected = false;
+    const ok = await connectCDP();
+    if (!ok) throw new Error('Connection lost. Relaunch Opera.');
+  }
+}
 
+export async function submitPost(subreddit, title, content, type = 'text') {
+  await ensureConnected();
   const page = await cdpBrowser.newPage();
 
   try {
@@ -57,7 +85,9 @@ export async function submitPost(subreddit, title, content, type = 'text') {
     await new Promise(r => setTimeout(r, 3000));
 
     if (page.url().includes('login')) {
-      throw new Error('Session expired');
+      await page.close();
+      connected = false;
+      throw new Error('Session expired. Log into Reddit again.');
     }
 
     const titleInput = await page.$('#post-title, [slot="title"], textarea, input:not([type="hidden"])');

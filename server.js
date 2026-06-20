@@ -206,16 +206,15 @@ app.get('*', (req, res) => {
 });
 
 async function init() {
-  setInterval(async () => {
-    if (!redditConnected) {
-      const ok = await connectCDP();
-      if (ok) redditConnected = true;
-    }
-  }, 5000);
+  // Try auto-connect if Opera already running with CDP
+  const ok = await connectCDP();
+  if (ok) redditConnected = true;
 
   app.listen(PORT, () => {
     console.log(`\n  🚀 Karma Farmer running at http://localhost:${PORT}\n`);
-    console.log('   Open the UI and click "Connect" to link Opera GX.\n');
+    if (!redditConnected) {
+      console.log('   Open http://localhost:3000 and click "Launch Opera GX"\n');
+    }
   });
 }
 
